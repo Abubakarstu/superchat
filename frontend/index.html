@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Superchat - WhatsApp AI Dashboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/@microsoft/signalr@8.0.0/dist/browser/signalr.min.js"></script>
+  <style>
+    body { font-family: 'Segoe UI', system-ui, sans-serif; }
+    .chat-list { height: calc(100vh - 80px); overflow-y: auto; }
+    .message-view { height: calc(100vh - 140px); overflow-y: auto; }
+    .message-bubble { max-width: 75%; padding: 8px 14px; margin-bottom: 6px; border-radius: 12px; word-wrap: break-word; }
+    .message-inbound { background: var(--bs-secondary-bg); align-self: flex-start; border-bottom-left-radius: 4px; }
+    .message-outbound { background: var(--bs-primary); color: #fff; align-self: flex-end; border-bottom-right-radius: 4px; }
+    .conversation-item { cursor: pointer; transition: background 0.15s; }
+    .conversation-item:hover { background: var(--bs-tertiary-bg); }
+    .conversation-item.active { background: var(--bs-primary-bg-subtle); }
+    .sidebar { border-right: 1px solid var(--bs-border-color); }
+    @media (max-width: 768px) { .sidebar { border-right: none; border-bottom: 1px solid var(--bs-border-color); } }
+    .qr-img { max-width: 280px; image-rendering: pixelated; }
+    .status-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+    .status-connected { background: #198754; }
+    .status-disconnected { background: #dc3545; }
+    .status-awaiting { background: #ffc107; }
+  </style>
+</head>
+<body>
+  <nav class="navbar navbar-expand-lg navbar-dark bg-dark border-bottom border-secondary">
+    <div class="container-fluid">
+      <a class="navbar-brand fw-bold" href="#"><i class="bi bi-whatsapp me-2"></i>Superchat</a>
+      <div class="d-flex align-items-center gap-3">
+        <span id="connectionBadge" class="badge bg-warning"><span class="status-dot status-awaiting"></span>Connecting...</span>
+        <button class="btn btn-outline-light btn-sm" onclick="showSettings()"><i class="bi bi-gear"></i> Settings</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container-fluid">
+    <div class="row">
+      <!-- Sidebar: Conversation List -->
+      <div class="col-md-4 col-lg-3 p-0 sidebar">
+        <div class="p-2 border-bottom">
+          <div class="input-group input-group-sm">
+            <span class="input-group-text"><i class="bi bi-search"></i></span>
+            <input type="text" class="form-control" id="searchInput" placeholder="Search conversations..." oninput="filterConversations()" />
+          </div>
+        </div>
+        <div id="conversationList" class="chat-list">
+          <div class="text-center text-secondary p-4"><i class="bi bi-chat-dots fs-1 d-block mb-2"></i>No conversations yet</div>
+        </div>
+      </div>
+
+      <!-- Main: Message View -->
+      <div class="col-md-8 col-lg-9 d-flex flex-column p-0">
+        <div id="messageHeader" class="p-3 border-bottom d-none">
+          <h5 id="contactName" class="mb-0"></h5>
+          <small class="text-secondary" id="contactPhone"></small>
+        </div>
+        <div id="messageView" class="message-view p-3 d-flex flex-column">
+          <div class="text-center text-secondary mt-5">
+            <i class="bi bi-chat-square-text fs-1 d-block mb-2"></i>
+            <p>Select a conversation to view messages</p>
+          </div>
+        </div>
+        <div id="inputArea" class="p-3 border-top d-none">
+          <div class="input-group">
+            <input type="text" class="form-control" id="messageInput" placeholder="Type a message..." onkeydown="if(event.key==='Enter') sendMessage()" />
+            <button class="btn btn-primary" onclick="sendMessage()"><i class="bi bi-send"></i></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div class="modal fade" id="settingsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-gear me-2"></i>Settings</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <ul class="nav nav-tabs mb-3" id="settingsTabs">
+            <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#aiConfig">AI Configuration</a></li>
+            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#connection">Connection</a></li>
+          </ul>
+          <div class="tab-content">
+            <div class="tab-pane fade show active" id="aiConfig">
+              <div id="aiConfigForm">
+                <div class="mb-3">
+                  <label class="form-label">AI Provider</label>
+                  <select class="form-select" id="aiProvider">
+                    <option value="claude">Claude (Anthropic)</option>
+                    <option value="openai">OpenAI (GPT)</option>
+                  </select>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">Model</label>
+                  <input type="text" class="form-control" id="aiModel" placeholder="e.g. claude-sonnet-4-20250514" />
+                </div>
+                <div class="row mb-3">
+                  <div class="col">
+                    <label class="form-label">Temperature</label>
+                    <input type="range" class="form-range" id="aiTemperature" min="0" max="2" step="0.1" value="0.7" oninput="this.nextElementSibling.textContent=this.value" />
+                    <small class="text-secondary">0.7</small>
+                  </div>
+                  <div class="col">
+                    <label class="form-label">Max Tokens</label>
+                    <input type="number" class="form-control" id="aiMaxTokens" value="1024" min="64" max="8192" />
+                  </div>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">System Prompt / Persona</label>
+                  <textarea class="form-control" id="aiSystemPrompt" rows="5">You are a helpful WhatsApp assistant. Respond concisely and naturally.</textarea>
+                </div>
+                <button class="btn btn-primary" onclick="saveAiConfig()"><i class="bi bi-check-lg"></i> Save Configuration</button>
+              </div>
+            </div>
+            <div class="tab-pane fade" id="connection">
+              <div class="text-center mb-3">
+                <div id="qrContainer">
+                  <p class="text-secondary">Scan the QR code with WhatsApp to connect:</p>
+                  <div id="qrCode" class="mb-2">
+                    <div class="spinner-border text-primary" role="status"></div>
+                  </div>
+                  <p class="small text-secondary" id="qrStatus">Waiting for QR code...</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    const API_BASE = "http://localhost:5000";
+    let currentConversationId = null;
+    let conversations = [];
+    let aiConfigId = null;
+    let pollInterval = null;
+
+    // SignalR connection
+    const connection = new signalR.HubConnectionBuilder()
+      .withUrl(`${API_BASE}/hubs/messages`)
+      .withAutomaticReconnect()
+      .build();
+
+    connection.on("MessageReceived", (msg) => {
+      if (currentConversationId === msg.conversationId) {
+        appendMessage(msg);
+      }
+      loadConversations();
+    });
+
+    connection.on("ConversationUpdated", () => loadConversations());
+
+    connection.start().catch(err => console.error("SignalR error:", err));
+
+    // Load conversations
+    async function loadConversations() {
+      try {
+        const res = await fetch(`${API_BASE}/api/conversations`);
+        conversations = await res.json();
+        renderConversations();
+      } catch (err) {
+        console.error("Failed to load conversations:", err);
+      }
+    }
+
+    function renderConversations() {
+      const list = document.getElementById("conversationList");
+      if (!conversations.length) {
+        list.innerHTML = '<div class="text-center text-secondary p-4"><i class="bi bi-chat-dots fs-1 d-block mb-2"></i>No conversations yet</div>';
+        return;
+      }
+      list.innerHTML = conversations.map(c => `
+        <div class="conversation-item p-3 border-bottom ${currentConversationId === c.id ? 'active' : ''}"
+             onclick="selectConversation('${c.id}')">
+          <div class="d-flex justify-content-between align-items-start">
+            <div class="fw-semibold text-truncate">${escapeHtml(c.contactName)}</div>
+            <small class="text-secondary ms-2 text-nowrap">${formatTime(c.lastMessageAt)}</small>
+          </div>
+          <div class="small text-secondary text-truncate">${escapeHtml(c.lastMessage || '')}</div>
+          ${c.messageCount > 0 ? `<small class="text-primary">${c.messageCount} messages</small>` : ''}
+        </div>
+      `).join("");
+    }
+
+    // Select conversation & load messages
+    async function selectConversation(id) {
+      currentConversationId = id;
+      const conv = conversations.find(c => c.id === id);
+      document.getElementById("messageHeader").classList.remove("d-none");
+      document.getElementById("inputArea").classList.remove("d-none");
+      document.getElementById("contactName").textContent = conv?.contactName || "Unknown";
+      document.getElementById("contactPhone").textContent = conv?.contactPhone || "";
+      renderConversations();
+
+      try {
+        const res = await fetch(`${API_BASE}/api/conversations/${id}/messages`);
+        const messages = await res.json();
+        const view = document.getElementById("messageView");
+        view.innerHTML = messages.map(m => `
+          <div class="message-bubble ${m.direction === 'Inbound' ? 'message-inbound' : 'message-outbound'}">
+            ${escapeHtml(m.content)}
+            <div class="small ${m.direction === 'Outbound' ? 'text-white-50' : 'text-secondary'}" style="margin-top:2px">
+              ${formatTime(m.createdAt)}
+              ${m.direction === 'Outbound' ? ` <i class="bi bi-check${m.status === 'Read' ? '-all' : ''}"></i>` : ''}
+            </div>
+          </div>
+        `).join("");
+        view.scrollTop = view.scrollHeight;
+      } catch (err) {
+        console.error("Failed to load messages:", err);
+      }
+    }
+
+    // Send message
+    async function sendMessage() {
+      const input = document.getElementById("messageInput");
+      const content = input.value.trim();
+      if (!content || !currentConversationId) return;
+      input.value = "";
+
+      const conv = conversations.find(c => c.id === currentConversationId);
+      try {
+        const res = await fetch(`${API_BASE}/api/conversations/${conv.remoteJid}/messages`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content, contactName: conv.contactName, contactPhone: conv.contactPhone })
+        });
+        if (res.ok) {
+          loadConversations();
+          selectConversation(currentConversationId);
+        }
+      } catch (err) {
+        console.error("Failed to send:", err);
+      }
+    }
+
+    // Append message to view
+    function appendMessage(msg) {
+      const view = document.getElementById("messageView");
+      if (currentConversationId !== msg.conversationId) return;
+      const div = document.createElement("div");
+      div.className = `message-bubble ${msg.direction === 'Inbound' ? 'message-inbound' : 'message-outbound'}`;
+      div.innerHTML = `${escapeHtml(msg.content)}
+        <div class="small ${msg.direction === 'Outbound' ? 'text-white-50' : 'text-secondary'}" style="margin-top:2px">
+          ${formatTime(msg.createdAt)}
+        </div>`;
+      view.appendChild(div);
+      view.scrollTop = view.scrollHeight;
+    }
+
+    // Settings
+    function showSettings() {
+      loadAiConfig();
+      loadQrCode();
+      const modal = new bootstrap.Modal(document.getElementById("settingsModal"));
+      modal.show();
+    }
+
+    async function loadAiConfig() {
+      try {
+        const res = await fetch(`${API_BASE}/api/config/ai`);
+        const configs = await res.json();
+        if (configs.length > 0) {
+          const c = configs[0];
+          aiConfigId = c.id;
+          document.getElementById("aiProvider").value = c.provider;
+          document.getElementById("aiModel").value = c.model || "";
+          document.getElementById("aiTemperature").value = c.temperature;
+          document.getElementById("aiTemperature").nextElementSibling.textContent = c.temperature;
+          document.getElementById("aiMaxTokens").value = c.maxTokens;
+          document.getElementById("aiSystemPrompt").value = c.systemPrompt;
+        }
+      } catch (err) {
+        console.error("Failed to load AI config:", err);
+      }
+    }
+
+    async function saveAiConfig() {
+      if (!aiConfigId) return;
+      const body = {
+        name: "Default",
+        provider: document.getElementById("aiProvider").value,
+        model: document.getElementById("aiModel").value,
+        temperature: parseFloat(document.getElementById("aiTemperature").value),
+        maxTokens: parseInt(document.getElementById("aiMaxTokens").value),
+        systemPrompt: document.getElementById("aiSystemPrompt").value,
+        isActive: true,
+      };
+      try {
+        const res = await fetch(`${API_BASE}/api/config/ai/${aiConfigId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        if (res.ok) {
+          showToast("AI configuration saved.");
+        }
+      } catch (err) {
+        console.error("Failed to save AI config:", err);
+      }
+    }
+
+    async function loadQrCode() {
+      try {
+        const res = await fetch(`${API_BASE}/api/config/qr`);
+        const data = await res.json();
+        const qrContainer = document.getElementById("qrCode");
+        const qrStatus = document.getElementById("qrStatus");
+        if (data.qr && !data.qr.includes("base64")) {
+          qrContainer.innerHTML = `<pre class="text-center small" style="font-size:10px;line-height:1.1">${data.qr}</pre>`;
+          qrStatus.textContent = "Scan the QR code above with WhatsApp";
+        } else if (data.qr && data.qr.includes("base64")) {
+          qrContainer.innerHTML = `<img src="${data.qr}" class="qr-img" alt="QR Code" />`;
+          qrStatus.textContent = "Scan the QR code with WhatsApp";
+        } else {
+          qrContainer.innerHTML = '<div class="spinner-border text-primary" role="status"></div>';
+          qrStatus.textContent = "Waiting for QR code...";
+        }
+        updateConnectionBadge(data.status);
+      } catch (err) {
+        console.error("Failed to load QR:", err);
+      }
+    }
+
+    async function checkConnection() {
+      try {
+        const res = await fetch(`${API_BASE}/api/config/status`);
+        const data = await res.json();
+        updateConnectionBadge(data.connected ? "connected" : "disconnected");
+      } catch {
+        updateConnectionBadge("disconnected");
+      }
+    }
+
+    function updateConnectionBadge(status) {
+      const badge = document.getElementById("connectionBadge");
+      if (status === "connected") {
+        badge.className = "badge bg-success";
+        badge.innerHTML = '<span class="status-dot status-connected"></span>Connected';
+      } else if (status === "awaiting_scan") {
+        badge.className = "badge bg-warning";
+        badge.innerHTML = '<span class="status-dot status-awaiting"></span>Scan QR';
+      } else {
+        badge.className = "badge bg-danger";
+        badge.innerHTML = '<span class="status-dot status-disconnected"></span>Disconnected';
+      }
+    }
+
+    function filterConversations() {
+      const q = document.getElementById("searchInput").value.toLowerCase();
+      document.querySelectorAll(".conversation-item").forEach((el, i) => {
+        const name = conversations[i]?.contactName?.toLowerCase() || "";
+        el.style.display = name.includes(q) ? "" : "none";
+      });
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement("div");
+      div.textContent = text || "";
+      return div.innerHTML;
+    }
+
+    function formatTime(dateStr) {
+      if (!dateStr) return "";
+      const d = new Date(dateStr);
+      return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    }
+
+    function showToast(msg) {
+      const existing = document.querySelector(".toast-container");
+      if (existing) existing.remove();
+      const container = document.createElement("div");
+      container.className = "toast-container position-fixed bottom-0 end-0 p-3";
+      container.innerHTML = `<div class="toast show align-items-center text-bg-success border-0" role="alert">
+        <div class="d-flex"><div class="toast-body">${msg}</div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button></div></div>`;
+      document.body.appendChild(container);
+      setTimeout(() => container.remove(), 3000);
+    }
+
+    // Init
+    loadConversations();
+    checkConnection();
+    setInterval(checkConnection, 15000);
+  </script>
+</body>
+</html>

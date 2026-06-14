@@ -1,0 +1,38 @@
+version: "3.8"
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: src/API/Dockerfile
+    ports:
+      - "5000:5000"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://0.0.0.0:5000
+      - ConnectionStrings__DefaultConnection=Data Source=/data/superchat.db
+      - BaileysService__BaseUrl=http://baileys-service:3001
+      - Ai__Provider=${AI_PROVIDER:-claude}
+      - Ai__ApiKey=${AI_API_KEY}
+    volumes:
+      - api_data:/data
+    depends_on:
+      - baileys-service
+    restart: unless-stopped
+
+  baileys-service:
+    build:
+      context: ./baileys-service
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - NET_API_URL=http://api:5000
+    volumes:
+      - baileys_auth:/app/auth_info
+    restart: unless-stopped
+
+volumes:
+  api_data:
+  baileys_auth:

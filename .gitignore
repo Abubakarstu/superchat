@@ -1,0 +1,28 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+*.sln.docstates
+*.db
+*.db-shm
+*.db-wal
+.vs/
+*.csproj.user
+**/appsettings.*.local.json
+
+## Node
+node_modules/
+npm-debug.log*
+
+## OS
+.DS_Store
+Thumbs.db
+
+## IDE
+.idea/
+.vscode/
+*.swp
+
+## Docker
+auth_info/
