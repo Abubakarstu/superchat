@@ -8,102 +8,70 @@ Open-source business messaging platform (Superchat alternative) built with .NET 
 Superchat/
 ├── src/
 │   ├── Core/
-│   │   ├── Domain/       # 30+ entities across 7 sub-domains
-│   │   └── Application/  # CQRS (MediatR), DTOs, FluentValidation
-│   ├── Infrastructure/   # EF Core + SQLite, 15+ repositories, channel services
-│   └── API/              # REST controllers, SignalR hub, Swagger
-├── baileys-service/      # Node.js Baileys WhatsApp gateway
-├── frontend/             # Bootstrap 5 SPA dashboard
+│   │   ├── Domain/         # 30+ entities across 7 sub-domains
+│   │   └── Application/    # CQRS (MediatR), DTOs, FluentValidation
+│   ├── Infrastructure/     # EF Core + SQLite, 15+ repositories, channel services
+│   └── API/                # REST API + MVC views (single project)
+│       ├── Controllers/    # REST API + HomeController
+│       ├── Views/          # Razor views (inbox, CRM, campaigns, etc.)
+│       └── wwwroot/        # Static assets (CSS, JS)
+├── baileys-service/        # Node.js Baileys WhatsApp gateway
 └── docker-compose.yml
 ```
 
+The API project serves both the REST API (`/api/*`) and the frontend dashboard (`/`). Single deployable unit.
+
 ## Features
 
-### WhatsApp Business
-- Connect multiple WhatsApp numbers via Baileys
-- Shared team inbox with assignment
-- Message templates (Utility/Marketing/Authentication)
-- Broadcast campaigns with segmentation
-
-### Omnichannel Inbox
-- WhatsApp, Telegram, Email, Instagram, Messenger support
-- Unified conversation view with channel badges
-- Cross-channel message history
-
-### CRM
-- Contact management with tags and lifecycle stages
-- Custom fields, notes, activity timeline
-- Segmentation for campaigns
-
-### Team Collaboration
-- Agent management with roles (admin/manager/agent)
-- Conversation assignment and ownership
-- Internal notes and mentions
-- Department routing via agent groups
-
-### Automation
-- Visual workflow builder (trigger → action)
-- Triggers: new message, new lead, campaign click
-- Actions: assign agent, add tag, send reply
-- Delay and conditional branching support
-
-### AI Agent
-- Claude or OpenAI integration
-- Configurable system prompt and persona
-- Temperature and max tokens control
-- Auto-reply to incoming messages
-
-### Campaigns & Broadcasts
-- Create and schedule WhatsApp campaigns
-- Audience segmentation by tags
-- Delivery, open, click, reply tracking
-- Opt-in/opt-out management
-
-### Analytics
-- Dashboard with KPIs (conversations, messages, response times)
-- Agent performance metrics
-- Conversation trends chart
-- Channel distribution chart
-
-### Web Widget
-- Customizable chat widget for websites
-- WhatsApp click-to-chat
-- Bot support with agent handoff
+- **WhatsApp Business** — Connect via Baileys, shared inbox, message templates, broadcast campaigns
+- **Omnichannel Inbox** — WhatsApp, Telegram, Email, Instagram, Messenger with unified conversation view
+- **CRM** — Contact management, tags, lifecycle stages, segmentation
+- **Team Collaboration** — Agent roles, conversation assignment, presence indicators
+- **Automation** — Visual workflow builder (trigger → action), delay support
+- **AI Agent** — Ollama (free, local), Claude, or OpenAI — configurable persona
+- **Campaigns** — Schedule WhatsApp campaigns, track delivery/opens/clicks
+- **Analytics** — KPIs, agent performance, trend charts (Chart.js)
+- **Web Widget** — Customizable chat widget for websites
 
 ## Tech Stack
 
 | Component | Technology |
 |-----------|-----------|
 | Backend | .NET 8, C# 12 |
+| Frontend | ASP.NET Core MVC + Razor Views |
 | Database | SQLite (via EF Core) |
 | CQRS | MediatR |
 | Validation | FluentValidation |
 | Real-time | SignalR |
 | WhatsApp | Baileys (Node.js) |
-| AI | Claude / OpenAI |
-| Frontend | Bootstrap 5, Chart.js |
-| Container | Docker Compose |
+| AI | Ollama (free, local, default) / Claude / OpenAI |
+| UI | Bootstrap 5, Chart.js |
 
 ## Prerequisites
 
 - [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
-- [Node.js 20+](https://nodejs.org/)
-- AI API key (Anthropic or OpenAI)
+- [Node.js 20+](https://nodejs.org/) (only for WhatsApp Baileys service)
+- [Ollama](https://ollama.com/) (optional, for local AI)
 
 ## Quick Start
 
-### 1. Configure
+### 1. Start the API (also serves the frontend)
 
-```json
-// src/API/appsettings.Development.json
-{
-  "Ai": { "Provider": "claude", "ApiKey": "sk-ant-..." },
-  "BaileysService": { "BaseUrl": "http://localhost:3001" },
-  "ConnectionStrings": { "DefaultConnection": "Data Source=superchat.db" }
-}
+```bash
+dotnet run --project src/API
 ```
 
-### 2. Start Baileys Service
+Open **http://localhost:5000** in your browser — the full dashboard loads immediately.
+
+### 2. (Optional) Install Ollama for free local AI
+
+```bash
+ollama pull llama3.2
+```
+
+The API auto-connects to `http://localhost:11434`. No API key needed.
+
+### 3. (Optional) Start Baileys for WhatsApp
 
 ```bash
 cd baileys-service
@@ -111,15 +79,17 @@ npm install
 npm start
 ```
 
-### 3. Start .NET API
+Then scan the QR code in Settings → Connection.
+
+## Quick Start (no WhatsApp, no AI)
+
+Just `dotnet run --project src/API` and open `http://localhost:5000`. All panels work — only WhatsApp messaging and AI auto-replies depend on external services.
+
+## Docker
 
 ```bash
-dotnet run --project src/API
+docker compose up --build
 ```
-
-### 4. Open Dashboard
-
-Open `frontend/index.html` in your browser.
 
 ## API Endpoints
 
@@ -137,25 +107,17 @@ Open `frontend/index.html` in your browser.
 | POST | `/api/team/assign` | Assign conversation |
 | GET/POST | `/api/channels` | Connect channels |
 | GET | `/api/analytics/dashboard` | Analytics dashboard |
-| GET | `/api/config/ai` | AI configuration |
-| PUT | `/api/config/ai/{id}` | Update AI config |
+| GET/PUT | `/api/config/ai/{id}` | AI configuration |
 | GET | `/api/config/qr` | WhatsApp QR code |
 | GET | `/api/config/status` | Connection status |
-| GET | `/api/widget/config` | Web widget config |
-
-## Docker
-
-```bash
-export AI_API_KEY=sk-ant-...
-docker compose up --build
-```
+| GET/PUT | `/api/widget/config` | Web widget config |
 
 ## All Open Source & Free
 
-This project uses zero paid dependencies:
-- **SQLite** — file-based database, no server needed
-- **Baileys** — free WhatsApp Web API (no Business API fees)
-- **Bootstrap 5** — free UI framework
-- **Chart.js** — free analytics charts
+Zero paid dependencies:
+- **Ollama** — free local AI (default)
+- **SQLite** — file-based database
+- **Baileys** — free WhatsApp Web API
+- **Bootstrap 5 + Chart.js** — free UI
 - **SignalR** — free real-time WebSockets
-- **MediatR, FluentValidation, AutoMapper** — free NuGet packages
+- **MediatR, FluentValidation** — free NuGet packages

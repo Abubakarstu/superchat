@@ -15,22 +15,22 @@ public class ConversationRepository : IConversationRepository
 
     public async Task<Conversation?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        return await _context.Conversations.FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
+        return await _context.Conversations.Include(c => c.Contact).FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
     }
 
     public async Task<Conversation?> GetByRemoteJidAsync(string remoteJid, CancellationToken cancellationToken = default)
     {
-        return await _context.Conversations.FirstOrDefaultAsync(c => c.RemoteJid == remoteJid, cancellationToken);
+        return await _context.Conversations.Include(c => c.Contact).FirstOrDefaultAsync(c => c.RemoteJid == remoteJid, cancellationToken);
     }
 
     public async Task<IEnumerable<Conversation>> GetAllAsync(CancellationToken cancellationToken = default)
     {
-        return await _context.Conversations.ToListAsync(cancellationToken);
+        return await _context.Conversations.Include(c => c.Contact).ToListAsync(cancellationToken);
     }
 
     public async Task<IEnumerable<Conversation>> GetActiveAsync(CancellationToken cancellationToken = default)
     {
-        return await _context.Conversations.Where(c => c.IsActive).ToListAsync(cancellationToken);
+        return await _context.Conversations.Include(c => c.Contact).Where(c => c.IsActive).ToListAsync(cancellationToken);
     }
 
     public void Add(Conversation conversation)

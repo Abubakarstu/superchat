@@ -39,6 +39,7 @@ public class AppDbContext : DbContext, IUnitOfWork
     public DbSet<ChannelAccount> ChannelAccounts => Set<ChannelAccount>();
     public DbSet<Integration> Integrations => Set<Integration>();
     public DbSet<WebWidget> WebWidgets => Set<WebWidget>();
+    public DbSet<MessageReaction> MessageReactions => Set<MessageReaction>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -64,6 +65,18 @@ public class AppDbContext : DbContext, IUnitOfWork
             entity.Property(e => e.Content).HasMaxLength(4096).IsRequired();
             entity.Property(e => e.MessageType).HasMaxLength(50);
             entity.Property(e => e.MediaUrl).HasMaxLength(1000);
+            entity.Property(e => e.FileName).HasMaxLength(500);
+            entity.Property(e => e.MimeType).HasMaxLength(100);
+            entity.HasMany(e => e.Reactions).WithOne(r => r.Message).HasForeignKey(r => r.MessageId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(e => e.ReplyTo).WithMany(e => e.Replies).HasForeignKey(e => e.ReplyToId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<MessageReaction>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Emoji).HasMaxLength(10).IsRequired();
+            entity.Property(e => e.SenderJid).HasMaxLength(100);
+            entity.Property(e => e.SenderName).HasMaxLength(200);
         });
 
         modelBuilder.Entity<User>(entity =>
@@ -226,17 +239,5 @@ public class AppDbContext : DbContext, IUnitOfWork
             entity.Property(e => e.Position).HasMaxLength(20);
         });
 
-        modelBuilder.Entity<AiConfig>().HasData(new AiConfig
-        {
-            Id = Guid.Parse("A1B2C3D4-E5F6-7890-ABCD-EF1234567890"),
-            Name = "Default",
-            SystemPrompt = "You are a helpful WhatsApp assistant. Respond concisely and naturally.",
-            Provider = "claude",
-            Model = "claude-sonnet-4-20250514",
-            Temperature = 0.7,
-            MaxTokens = 1024,
-            IsActive = true,
-            CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc)
-        });
     }
 }

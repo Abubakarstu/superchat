@@ -14,6 +14,7 @@ public class SendMessageHandler : IRequestHandler<SendMessageCommand, MessageDto
     private readonly IMessageRepository _messageRepo;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IWhatsAppService _whatsAppService;
+    private readonly IChannelServiceFactory _channelFactory;
     private readonly ILogger<SendMessageHandler> _logger;
 
     public SendMessageHandler(
@@ -21,12 +22,14 @@ public class SendMessageHandler : IRequestHandler<SendMessageCommand, MessageDto
         IMessageRepository messageRepo,
         IUnitOfWork unitOfWork,
         IWhatsAppService whatsAppService,
+        IChannelServiceFactory channelFactory,
         ILogger<SendMessageHandler> logger)
     {
         _conversationRepo = conversationRepo;
         _messageRepo = messageRepo;
         _unitOfWork = unitOfWork;
         _whatsAppService = whatsAppService;
+        _channelFactory = channelFactory;
         _logger = logger;
     }
 
@@ -44,19 +47,55 @@ public class SendMessageHandler : IRequestHandler<SendMessageCommand, MessageDto
             _conversationRepo.Add(conversation);
         }
 
+        var isMedia = !string.IsNullOrEmpty(request.MessageType) && request.MessageType != "text";
+
         var message = new Message
         {
             ConversationId = conversation.Id,
             Content = request.Content,
             Direction = MessageDirection.Outbound,
-            Status = MessageStatus.Pending
+            Status = MessageStatus.Pending,
+            MessageType = request.MessageType ?? (isMedia ? request.MessageType : "text"),
+            MediaUrl = request.MediaUrl,
+            FileName = request.FileName,
+            MimeType = request.MimeType,
+            ReplyToId = request.ReplyToId
         };
         _messageRepo.Add(message);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         try
         {
-            await _whatsAppService.SendMessageAsync(request.RemoteJid, request.Content);
+            if (conversation.ChannelType == "whatsapp")
+            {
+                if (isMedia && !string.IsNullOrEmpty(request.MediaUrl))
+                {
+                    await _whatsAppService.SendMediaAsync(new SendMediaRequest
+                    {
+                        RemoteJid = request.RemoteJid,
+                        MediaUrl = request.MediaUrl,
+                        MediaType = request.MessageType ?? "document",
+                        Caption = request.Content,
+                        FileName = request.FileName ?? "file",
+                        MimeType = request.MimeType
+                    });
+                }
+                else
+                {
+                    await _whatsAppService.SendMessageAsync(request.RemoteJid, request.Content);
+                }
+            }
+            else
+            {
+                var channelService = _channelFactory.GetService(conversation.ChannelType);
+                if (channelService != null && conversation.ChannelAccountId.HasValue)
+                {
+                    await channelService.SendMessageAsync(
+                        conversation.ChannelAccountId.ToString()!,
+                        conversation.RemoteJid,
+                        request.Content);
+                }
+            }
             message.Status = MessageStatus.Sent;
             _messageRepo.Update(message);
             await _unitOfWork.SaveChangesAsync(cancellationToken);
@@ -82,8 +121,15 @@ public class SendMessageHandler : IRequestHandler<SendMessageCommand, MessageDto
             Status = message.Status.ToString(),
             CreatedAt = message.CreatedAt,
             DeliveredAt = message.DeliveredAt,
+            ReadAt = message.ReadAt,
             MediaUrl = message.MediaUrl,
-            MessageType = message.MessageType
+            MessageType = message.MessageType,
+            FileName = message.FileName,
+            FileSize = message.FileSize,
+            MimeType = message.MimeType,
+            ReplyToId = message.ReplyToId,
+            IsEdited = message.IsEdited,
+            EditedAt = message.EditedAt
         };
     }
 }

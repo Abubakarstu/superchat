@@ -2,5 +2,5 @@ namespace Application.Interfaces;
 
 public interface IAiService
 {
-    Task<string> GenerateReplyAsync(string message, string systemPrompt, string model, double temperature, int maxTokens);
+    Task<string> GenerateReplyAsync(string message, string systemPrompt, string model, double temperature, int maxTokens, string? ollamaBaseUrl = null);
 }

@@ -18,6 +18,13 @@ public class GetQrCodeHandler : IRequestHandler<GetQrCodeQuery, string>
 
     public async Task<string> Handle(GetQrCodeQuery request, CancellationToken cancellationToken)
     {
-        return await _whatsAppService.GetQrCodeAsync();
+        try
+        {
+            return await _whatsAppService.GetQrCodeAsync();
+        }
+        catch
+        {
+            return string.Empty;
+        }
     }
 }

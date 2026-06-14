@@ -12,5 +12,6 @@ public class UpdateAiConfigCommand : IRequest<AiConfigDto>
     public string? Model { get; set; }
     public double Temperature { get; set; }
     public int MaxTokens { get; set; }
+    public string OllamaBaseUrl { get; set; } = "http://localhost:11434";
     public bool IsActive { get; set; }
 }

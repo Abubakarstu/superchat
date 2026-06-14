@@ -27,6 +27,7 @@ public class UpdateAiConfigHandler : IRequestHandler<UpdateAiConfigCommand, AiCo
         config.Model = request.Model;
         config.Temperature = request.Temperature;
         config.MaxTokens = request.MaxTokens;
+        config.OllamaBaseUrl = request.OllamaBaseUrl;
         config.IsActive = request.IsActive;
         config.UpdatedAt = DateTime.UtcNow;
 
@@ -42,6 +43,7 @@ public class UpdateAiConfigHandler : IRequestHandler<UpdateAiConfigCommand, AiCo
             Model = config.Model,
             Temperature = config.Temperature,
             MaxTokens = config.MaxTokens,
+            OllamaBaseUrl = config.OllamaBaseUrl,
             IsActive = config.IsActive
         };
     }

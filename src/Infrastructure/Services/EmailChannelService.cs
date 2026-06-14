@@ -45,4 +45,19 @@ public class EmailChannelService : IChannelService
     public Task<bool> ValidateConnectionAsync(string channelAccountId) => Task.FromResult(true);
 
     public Task<string> GetChannelInfoAsync(string channelAccountId) => Task.FromResult("email");
+
+    public Task<string> RegisterWebhookAsync(string channelAccountId, string webhookUrl)
+    {
+        return Task.FromResult("");
+    }
+
+    public Task UnregisterWebhookAsync(string channelAccountId)
+    {
+        return Task.CompletedTask;
+    }
+
+    public Task<IncomingMessage?> ParseWebhookAsync(WebhookPayload payload, Dictionary<string, string> config)
+    {
+        return Task.FromResult<IncomingMessage?>(null);
+    }
 }

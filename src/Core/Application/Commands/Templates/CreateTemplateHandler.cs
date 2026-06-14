@@ -28,6 +28,8 @@ public class CreateTemplateHandler : IRequestHandler<CreateTemplateCommand, Temp
             Header = request.Header,
             Footer = request.Footer,
             Buttons = request.Buttons,
+            ContentType = request.ContentType,
+            TypesJson = request.TypesJson,
             Status = "PENDING"
         };
         _templateRepo.Add(template);
@@ -45,6 +47,8 @@ public class CreateTemplateHandler : IRequestHandler<CreateTemplateCommand, Temp
             Header = template.Header,
             Footer = template.Footer,
             Buttons = template.Buttons,
+            ContentType = template.ContentType,
+            TypesJson = template.TypesJson,
             CreatedAt = template.CreatedAt
         };
     }

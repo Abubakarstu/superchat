@@ -15,12 +15,17 @@ public class MessageRepository : IMessageRepository
 
     public async Task<Message?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        return await _context.Messages.FirstOrDefaultAsync(m => m.Id == id, cancellationToken);
+        return await _context.Messages
+            .Include(m => m.Reactions)
+            .Include(m => m.ReplyTo)
+            .FirstOrDefaultAsync(m => m.Id == id, cancellationToken);
     }
 
     public async Task<IEnumerable<Message>> GetByConversationIdAsync(Guid conversationId, CancellationToken cancellationToken = default)
     {
         return await _context.Messages
+            .Include(m => m.Reactions)
+            .Include(m => m.ReplyTo)
             .Where(m => m.ConversationId == conversationId)
             .OrderBy(m => m.CreatedAt)
             .ToListAsync(cancellationToken);

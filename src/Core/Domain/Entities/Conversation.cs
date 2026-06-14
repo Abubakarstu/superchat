@@ -18,6 +18,9 @@ public class Conversation
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime LastMessageAt { get; set; } = DateTime.UtcNow;
     public bool IsActive { get; set; } = true;
+    public bool IsOnline { get; set; }
+    public bool IsTyping { get; set; }
+    public DateTime? LastSeenAt { get; set; }
 
     public Contact? Contact { get; set; }
     public ChannelAccount? ChannelAccount { get; set; }

@@ -20,13 +20,14 @@ public class AiService : IAiService
         _logger = logger;
     }
 
-    public async Task<string> GenerateReplyAsync(string message, string systemPrompt, string model, double temperature, int maxTokens)
+    public async Task<string> GenerateReplyAsync(string message, string systemPrompt, string model, double temperature, int maxTokens, string? ollamaBaseUrl = null)
     {
         try
         {
             return _options.Provider?.ToLower() switch
             {
                 "openai" => await CallOpenAiAsync(message, systemPrompt, model, temperature, maxTokens),
+                "ollama" => await CallOllamaAsync(message, systemPrompt, model, temperature, maxTokens, ollamaBaseUrl),
                 _ => await CallClaudeAsync(message, systemPrompt, model, temperature, maxTokens),
             };
         }
@@ -83,12 +84,72 @@ public class AiService : IAiService
         var json = await response.Content.ReadFromJsonAsync<OpenAiResponse>();
         return json?.Choices?.FirstOrDefault()?.Message?.Content ?? "No response generated.";
     }
+
+    private async Task<string> CallOllamaAsync(string message, string systemPrompt, string model, double temperature, int maxTokens, string? ollamaBaseUrl = null)
+    {
+        var baseUrl = (!string.IsNullOrWhiteSpace(ollamaBaseUrl)) ? ollamaBaseUrl.TrimEnd('/') : _options.OllamaBaseUrl.TrimEnd('/');
+        var request = new OllamaRequest
+        {
+            Model = string.IsNullOrWhiteSpace(model) ? "llama3.2" : model,
+            Prompt = message,
+            System = systemPrompt,
+            Stream = false,
+            Options = new OllamaOptions
+            {
+                Temperature = temperature,
+                MaxTokens = maxTokens
+            }
+        };
+
+        var response = await _httpClient.PostAsJsonAsync($"{baseUrl}/api/generate", request);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorBody = await response.Content.ReadAsStringAsync();
+            _logger.LogWarning("Ollama returned {Status}: {Error}", response.StatusCode, errorBody);
+            if (errorBody.Contains("does not support image"))
+                return "I can only respond to text messages, not images or media.";
+            return "I'm sorry, I couldn't process that request.";
+        }
+
+        var json = await response.Content.ReadFromJsonAsync<OllamaResponse>();
+        return json?.Response ?? "No response generated.";
+    }
 }
 
 public class AiOptions
 {
     public string ApiKey { get; set; } = string.Empty;
-    public string Provider { get; set; } = "claude";
+    public string Provider { get; set; } = "ollama";
+    public string OllamaBaseUrl { get; set; } = "http://localhost:11434";
+}
+
+public class OllamaRequest
+{
+    [JsonPropertyName("model")]
+    public string Model { get; set; } = "llama3.2";
+    [JsonPropertyName("prompt")]
+    public string Prompt { get; set; } = string.Empty;
+    [JsonPropertyName("system")]
+    public string? System { get; set; }
+    [JsonPropertyName("stream")]
+    public bool Stream { get; set; } = false;
+    [JsonPropertyName("options")]
+    public OllamaOptions? Options { get; set; }
+}
+
+public class OllamaOptions
+{
+    [JsonPropertyName("temperature")]
+    public double Temperature { get; set; }
+    [JsonPropertyName("num_predict")]
+    public int MaxTokens { get; set; }
+}
+
+public class OllamaResponse
+{
+    [JsonPropertyName("response")]
+    public string? Response { get; set; }
 }
 
 public class ClaudeResponse

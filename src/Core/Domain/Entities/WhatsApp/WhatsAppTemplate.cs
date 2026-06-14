@@ -16,6 +16,8 @@ public class WhatsAppTemplate
     public string? MediaUrl { get; set; }
     public string? MediaType { get; set; }
     public string? TemplateId { get; set; }
+    public string ContentType { get; set; } = "twilio/text";
+    public string? TypesJson { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? ApprovedAt { get; set; }
     public WhatsAppAccount Account { get; set; } = null!;

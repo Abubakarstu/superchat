@@ -6,7 +6,7 @@ using Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllers();
+builder.Services.AddControllersWithViews();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddSignalR();
@@ -39,8 +39,32 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+var baileysRegistered = false;
+app.Use(async (ctx, next) =>
+{
+    if (!baileysRegistered && ctx.Request.Host.HasValue)
+    {
+        baileysRegistered = true;
+        var apiUrl = $"{ctx.Request.Scheme}://{ctx.Request.Host}";
+        var baileysUrl = builder.Configuration.GetSection("BaileysService")["BaseUrl"] ?? "http://localhost:3001";
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(3) };
+                await client.PostAsJsonAsync($"{baileysUrl}/register", new { apiUrl });
+            }
+            catch { }
+        });
+    }
+    await next();
+});
+
+app.UseStaticFiles();
+app.UseRouting();
 app.UseCors("AllowFrontend");
 app.MapControllers();
 app.MapHub<MessageHub>("/hubs/messages");
+app.MapControllerRoute(name: "default", pattern: "{controller=Home}/{action=Index}/{id?}");
 
 app.Run();

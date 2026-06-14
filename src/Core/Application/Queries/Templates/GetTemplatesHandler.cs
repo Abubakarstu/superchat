@@ -32,6 +32,8 @@ public class GetTemplatesHandler : IRequestHandler<GetTemplatesQuery, IEnumerabl
             Header = t.Header,
             Footer = t.Footer,
             Buttons = t.Buttons,
+            ContentType = t.ContentType,
+            TypesJson = t.TypesJson,
             CreatedAt = t.CreatedAt
         });
     }

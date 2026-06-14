@@ -13,6 +13,8 @@ public class TemplateDto
     public string? Header { get; set; }
     public string? Footer { get; set; }
     public string? Buttons { get; set; }
+    public string ContentType { get; set; } = "twilio/text";
+    public string? TypesJson { get; set; }
     public DateTime CreatedAt { get; set; }
 }
 

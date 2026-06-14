@@ -25,6 +25,7 @@ public class GetAiConfigsHandler : IRequestHandler<GetAiConfigsQuery, IEnumerabl
             Model = c.Model,
             Temperature = c.Temperature,
             MaxTokens = c.MaxTokens,
+            OllamaBaseUrl = c.OllamaBaseUrl,
             IsActive = c.IsActive
         });
     }

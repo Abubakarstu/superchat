@@ -11,4 +11,7 @@ public class HandleIncomingMessageCommand : IRequest<MessageDto>
     public string? ContactPhone { get; set; }
     public string? MessageId { get; set; }
     public string? MessageType { get; set; }
+    public string? MediaUrl { get; set; }
+    public string? FileName { get; set; }
+    public string? MimeType { get; set; }
 }

@@ -9,6 +9,7 @@ public class AiConfigDto
     public string? Model { get; set; }
     public double Temperature { get; set; }
     public int MaxTokens { get; set; }
+    public string OllamaBaseUrl { get; set; } = "http://localhost:11434";
     public bool IsActive { get; set; }
 }
 
@@ -20,5 +21,6 @@ public class UpdateAiConfigDto
     public string? Model { get; set; }
     public double Temperature { get; set; }
     public int MaxTokens { get; set; }
+    public string OllamaBaseUrl { get; set; } = "http://localhost:11434";
     public bool IsActive { get; set; }
 }

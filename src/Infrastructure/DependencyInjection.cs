@@ -34,6 +34,7 @@ public static class DependencyInjection
         services.AddScoped<IChannelAccountRepository, ChannelAccountRepository>();
         services.AddScoped<IIntegrationRepository, IntegrationRepository>();
         services.AddScoped<IWebWidgetRepository, WebWidgetRepository>();
+        services.AddScoped<IMessageReactionRepository, MessageReactionRepository>();
         services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<AppDbContext>());
 
         services.Configure<BaileysOptions>(configuration.GetSection("BaileysService"));
@@ -47,8 +48,10 @@ public static class DependencyInjection
 
         services.AddScoped<TelegramChannelService>();
         services.AddScoped<EmailChannelService>();
+        services.AddHttpClient<FacebookChannelService>();
         services.AddScoped<IChannelService>(sp => sp.GetRequiredService<TelegramChannelService>());
         services.AddScoped<IChannelService>(sp => sp.GetRequiredService<EmailChannelService>());
+        services.AddScoped<IChannelService>(sp => sp.GetRequiredService<FacebookChannelService>());
         services.AddScoped<IChannelServiceFactory, ChannelServiceFactory>();
 
         return services;

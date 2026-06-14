@@ -4,6 +4,7 @@ using Domain.Entities;
 using Domain.Enums;
 using Domain.Interfaces;
 using MediatR;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace Application.Commands;
@@ -16,6 +17,7 @@ public class HandleIncomingMessageHandler : IRequestHandler<HandleIncomingMessag
     private readonly IUnitOfWork _unitOfWork;
     private readonly IAiService _aiService;
     private readonly IWhatsAppService _whatsAppService;
+    private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<HandleIncomingMessageHandler> _logger;
 
     public HandleIncomingMessageHandler(
@@ -25,6 +27,7 @@ public class HandleIncomingMessageHandler : IRequestHandler<HandleIncomingMessag
         IUnitOfWork unitOfWork,
         IAiService aiService,
         IWhatsAppService whatsAppService,
+        IServiceScopeFactory scopeFactory,
         ILogger<HandleIncomingMessageHandler> logger)
     {
         _conversationRepo = conversationRepo;
@@ -33,12 +36,14 @@ public class HandleIncomingMessageHandler : IRequestHandler<HandleIncomingMessag
         _unitOfWork = unitOfWork;
         _aiService = aiService;
         _whatsAppService = whatsAppService;
+        _scopeFactory = scopeFactory;
         _logger = logger;
     }
 
     public async Task<MessageDto> Handle(HandleIncomingMessageCommand request, CancellationToken cancellationToken)
     {
         var conversation = await _conversationRepo.GetByRemoteJidAsync(request.RemoteJid, cancellationToken);
+        var isNew = false;
         if (conversation == null)
         {
             conversation = new Conversation
@@ -48,6 +53,7 @@ public class HandleIncomingMessageHandler : IRequestHandler<HandleIncomingMessag
                 ContactPhone = request.ContactPhone
             };
             _conversationRepo.Add(conversation);
+            isNew = true;
         }
 
         var incomingMessage = new Message
@@ -56,46 +62,71 @@ public class HandleIncomingMessageHandler : IRequestHandler<HandleIncomingMessag
             Content = request.Content,
             Direction = MessageDirection.Inbound,
             Status = MessageStatus.Delivered,
-            MessageType = request.MessageType ?? "text"
+            MessageType = request.MessageType ?? "text",
+            MediaUrl = request.MediaUrl,
+            FileName = request.FileName,
+            MimeType = request.MimeType
         };
         _messageRepo.Add(incomingMessage);
         conversation.LastMessageAt = incomingMessage.CreatedAt;
-        _conversationRepo.Update(conversation);
+        if (!isNew) _conversationRepo.Update(conversation);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-        _ = Task.Run(async () =>
+        var isMedia = request.MessageType != "text" && !string.IsNullOrEmpty(request.MessageType);
+        if (!isMedia)
         {
-            try
+            var remoteJid = request.RemoteJid;
+            var content = request.Content;
+            var conversationId = conversation.Id;
+            _ = Task.Run(async () =>
             {
-                var aiConfig = await _aiConfigRepo.GetActiveAsync(cancellationToken);
-                var reply = await _aiService.GenerateReplyAsync(
-                    request.Content,
-                    aiConfig?.SystemPrompt ?? "You are a helpful WhatsApp assistant.",
-                    aiConfig?.Model ?? "claude-sonnet-4-20250514",
-                    aiConfig?.Temperature ?? 0.7,
-                    aiConfig?.MaxTokens ?? 1024);
-
-                var replyMessage = new Message
+                try
                 {
-                    ConversationId = conversation.Id,
-                    Content = reply,
-                    Direction = MessageDirection.Outbound,
-                    Status = MessageStatus.Pending
-                };
-                _messageRepo.Add(replyMessage);
+                    using var scope = _scopeFactory.CreateScope();
+                    var aiConfigRepo = scope.ServiceProvider.GetRequiredService<IAiConfigRepository>();
+                    var messageRepo = scope.ServiceProvider.GetRequiredService<IMessageRepository>();
+                    var conversationRepo = scope.ServiceProvider.GetRequiredService<IConversationRepository>();
+                    var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+                    var aiService = scope.ServiceProvider.GetRequiredService<IAiService>();
+                    var whatsAppService = scope.ServiceProvider.GetRequiredService<IWhatsAppService>();
 
-                await _whatsAppService.SendMessageAsync(request.RemoteJid, reply);
-                replyMessage.Status = MessageStatus.Sent;
-                _messageRepo.Update(replyMessage);
-                conversation.LastMessageAt = replyMessage.CreatedAt;
-                _conversationRepo.Update(conversation);
-                await _unitOfWork.SaveChangesAsync(cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to process AI reply for {RemoteJid}", request.RemoteJid);
-            }
-        }, cancellationToken);
+                    var aiConfig = await aiConfigRepo.GetActiveAsync();
+                    var reply = await aiService.GenerateReplyAsync(
+                        content,
+                        aiConfig?.SystemPrompt ?? "You are a helpful WhatsApp assistant.",
+                        aiConfig?.Model ?? "llama3.2",
+                        aiConfig?.Temperature ?? 0.7,
+                        aiConfig?.MaxTokens ?? 1024,
+                        aiConfig?.OllamaBaseUrl);
+
+                    var replyMessage = new Message
+                    {
+                        ConversationId = conversationId,
+                        Content = reply,
+                        Direction = MessageDirection.Outbound,
+                        Status = MessageStatus.Pending
+                    };
+                    messageRepo.Add(replyMessage);
+
+                    await whatsAppService.SendMessageAsync(remoteJid, reply);
+                    replyMessage.Status = MessageStatus.Sent;
+                    messageRepo.Update(replyMessage);
+
+                    var conv = await conversationRepo.GetByIdAsync(conversationId);
+                    if (conv != null)
+                    {
+                        conv.LastMessageAt = replyMessage.CreatedAt;
+                        conversationRepo.Update(conv);
+                    }
+
+                    await uow.SaveChangesAsync();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to process AI reply for {RemoteJid}", remoteJid);
+                }
+            });
+        }
 
         return new MessageDto
         {
@@ -106,8 +137,11 @@ public class HandleIncomingMessageHandler : IRequestHandler<HandleIncomingMessag
             Status = incomingMessage.Status.ToString(),
             CreatedAt = incomingMessage.CreatedAt,
             DeliveredAt = incomingMessage.DeliveredAt,
-            MediaUrl = incomingMessage.MediaUrl,
-            MessageType = incomingMessage.MessageType
+            ReadAt = incomingMessage.ReadAt,
+            MediaUrl = incomingMessage.MediaUrl ?? request.MediaUrl,
+            MessageType = incomingMessage.MessageType,
+            FileName = incomingMessage.FileName ?? request.FileName,
+            MimeType = incomingMessage.MimeType ?? request.MimeType
         };
     }
 }

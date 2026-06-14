@@ -1,5 +1,6 @@
 using Application.Commands.Contacts;
 using Application.DTOs;
+using Application.Interfaces;
 using Application.Queries.Contacts;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
@@ -11,8 +12,22 @@ namespace API.Controllers;
 public class ContactsController : ControllerBase
 {
     private readonly IMediator _mediator;
+    private readonly IWhatsAppService _whatsApp;
 
-    public ContactsController(IMediator mediator) => _mediator = mediator;
+    public ContactsController(IMediator mediator, IWhatsAppService whatsApp)
+    {
+        _mediator = mediator;
+        _whatsApp = whatsApp;
+    }
+
+    [HttpGet("profile-picture")]
+    public async Task<IActionResult> GetProfilePicture([FromQuery] string jid)
+    {
+        if (string.IsNullOrEmpty(jid)) return BadRequest("jid required");
+        var bytes = await _whatsApp.GetProfilePictureAsync(jid);
+        if (bytes == null) return NotFound();
+        return File(bytes, "image/jpeg");
+    }
 
     [HttpGet]
     public async Task<ActionResult<IEnumerable<ContactDto>>> GetAll([FromQuery] string? tag, [FromQuery] string? search)
@@ -48,5 +63,13 @@ public class ContactsController : ControllerBase
         command.ContactId = id;
         await _mediator.Send(command);
         return Ok();
+    }
+
+    [HttpPost("{jid}/block")]
+    public async Task<IActionResult> Block(string jid, [FromBody] BlockContactRequest request)
+    {
+        request.RemoteJid = Uri.UnescapeDataString(jid);
+        await _whatsApp.BlockContactAsync(request);
+        return Ok(new { status = request.Block ? "blocked" : "unblocked" });
     }
 }
