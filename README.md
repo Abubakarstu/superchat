@@ -1,6 +1,6 @@
-# Superchat - WhatsApp AI Chatbot
+# Superchat - Business Messaging Platform
 
-A .NET 8 Web API using Clean Architecture for a WhatsApp AI Chatbot integration with Anthropic Claude / OpenAI.
+Open-source business messaging platform (Superchat alternative) built with .NET 8 Clean Architecture. Centralizes WhatsApp, Telegram, Email, and Web Chat into a unified inbox with CRM, automation, AI, campaigns, and team collaboration.
 
 ## Architecture
 
@@ -8,41 +8,98 @@ A .NET 8 Web API using Clean Architecture for a WhatsApp AI Chatbot integration 
 Superchat/
 ├── src/
 │   ├── Core/
-│   │   ├── Domain/        # Entities, enums, repository interfaces
-│   │   └── Application/   # CQRS (MediatR), DTOs, FluentValidation, service interfaces
-│   ├── Infrastructure/    # EF Core, WhatsAppService, AiService implementations
-│   └── API/              # Controllers, SignalR hub, Program.cs
-├── baileys-service/       # Node.js + Baileys WhatsApp microservice
-├── frontend/             # Bootstrap 5 + Tailwind HTML dashboard
-├── docker-compose.yml    # Orchestrates .NET API + Baileys service
-└── Superchat.sln
+│   │   ├── Domain/       # 30+ entities across 7 sub-domains
+│   │   └── Application/  # CQRS (MediatR), DTOs, FluentValidation
+│   ├── Infrastructure/   # EF Core + SQLite, 15+ repositories, channel services
+│   └── API/              # REST controllers, SignalR hub, Swagger
+├── baileys-service/      # Node.js Baileys WhatsApp gateway
+├── frontend/             # Bootstrap 5 SPA dashboard
+└── docker-compose.yml
 ```
+
+## Features
+
+### WhatsApp Business
+- Connect multiple WhatsApp numbers via Baileys
+- Shared team inbox with assignment
+- Message templates (Utility/Marketing/Authentication)
+- Broadcast campaigns with segmentation
+
+### Omnichannel Inbox
+- WhatsApp, Telegram, Email, Instagram, Messenger support
+- Unified conversation view with channel badges
+- Cross-channel message history
+
+### CRM
+- Contact management with tags and lifecycle stages
+- Custom fields, notes, activity timeline
+- Segmentation for campaigns
+
+### Team Collaboration
+- Agent management with roles (admin/manager/agent)
+- Conversation assignment and ownership
+- Internal notes and mentions
+- Department routing via agent groups
+
+### Automation
+- Visual workflow builder (trigger → action)
+- Triggers: new message, new lead, campaign click
+- Actions: assign agent, add tag, send reply
+- Delay and conditional branching support
+
+### AI Agent
+- Claude or OpenAI integration
+- Configurable system prompt and persona
+- Temperature and max tokens control
+- Auto-reply to incoming messages
+
+### Campaigns & Broadcasts
+- Create and schedule WhatsApp campaigns
+- Audience segmentation by tags
+- Delivery, open, click, reply tracking
+- Opt-in/opt-out management
+
+### Analytics
+- Dashboard with KPIs (conversations, messages, response times)
+- Agent performance metrics
+- Conversation trends chart
+- Channel distribution chart
+
+### Web Widget
+- Customizable chat widget for websites
+- WhatsApp click-to-chat
+- Bot support with agent handoff
+
+## Tech Stack
+
+| Component | Technology |
+|-----------|-----------|
+| Backend | .NET 8, C# 12 |
+| Database | SQLite (via EF Core) |
+| CQRS | MediatR |
+| Validation | FluentValidation |
+| Real-time | SignalR |
+| WhatsApp | Baileys (Node.js) |
+| AI | Claude / OpenAI |
+| Frontend | Bootstrap 5, Chart.js |
+| Container | Docker Compose |
 
 ## Prerequisites
 
 - [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
 - [Node.js 20+](https://nodejs.org/)
-- An AI API key (Anthropic Claude or OpenAI)
-- Docker & Docker Compose (optional, for containerized setup)
+- AI API key (Anthropic or OpenAI)
 
-## Quick Start (Development)
+## Quick Start
 
-### 1. Configure Secrets
-
-Copy and edit `src/API/appsettings.Development.json`:
+### 1. Configure
 
 ```json
+// src/API/appsettings.Development.json
 {
-  "Ai": {
-    "Provider": "claude",
-    "ApiKey": "sk-ant-..."
-  },
-  "BaileysService": {
-    "BaseUrl": "http://localhost:3001"
-  },
-  "ConnectionStrings": {
-    "DefaultConnection": "Data Source=superchat.db"
-  }
+  "Ai": { "Provider": "claude", "ApiKey": "sk-ant-..." },
+  "BaileysService": { "BaseUrl": "http://localhost:3001" },
+  "ConnectionStrings": { "DefaultConnection": "Data Source=superchat.db" }
 }
 ```
 
@@ -60,52 +117,45 @@ npm start
 dotnet run --project src/API
 ```
 
-### 4. Open Frontend
+### 4. Open Dashboard
 
-Open `frontend/index.html` in your browser (or serve with any static server).
-
-## Setting Up WhatsApp
-
-1. Start the Baileys service and watch the terminal for a QR code.
-2. Open the frontend, click **Settings** → **Connection** tab to see the QR.
-3. Open WhatsApp on your phone → **Linked Devices** → **Link a Device**.
-4. Scan the QR code.
-
-## AI Provider Configuration
-
-### Claude (Anthropic)
-- Provider: `claude`
-- Model: `claude-sonnet-4-20250514` (or `claude-3-haiku-20240307`)
-- Get API key from: https://console.anthropic.com/
-
-### OpenAI
-- Provider: `openai`
-- Model: `gpt-4o` (or `gpt-3.5-turbo`)
-- Get API key from: https://platform.openai.com/api-keys
-
-## Docker Deployment
-
-```bash
-export AI_API_KEY=sk-ant-...
-export AI_PROVIDER=claude
-docker compose up --build
-```
-
-The API will be available at `http://localhost:5000` and Swagger UI at `http://localhost:5000/swagger`.
+Open `frontend/index.html` in your browser.
 
 ## API Endpoints
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/conversations` | List all conversations |
-| GET | `/api/conversations/{id}/messages` | Get messages for a conversation |
-| POST | `/api/conversations/{remoteJid}/messages` | Send a message |
-| POST | `/api/webhook/incoming` | Webhook for incoming WhatsApp messages |
-| GET | `/api/config/ai` | Get AI configuration |
-| PUT | `/api/config/ai/{id}` | Update AI configuration |
-| GET | `/api/config/qr` | Get WhatsApp QR code |
-| GET | `/api/config/status` | Get connection status |
+| GET/POST | `/api/conversations` | List/Send conversations |
+| GET | `/api/conversations/{id}/messages` | Get messages |
+| POST | `/api/webhook/incoming` | Incoming message webhook |
+| GET/POST | `/api/contacts` | CRUD contacts |
+| GET/POST | `/api/campaigns` | Manage campaigns |
+| POST | `/api/campaigns/{id}/send` | Send campaign |
+| GET/POST | `/api/templates` | WhatsApp templates |
+| GET/POST | `/api/workflows` | Automation workflows |
+| GET/POST | `/api/team/agents` | Manage agents |
+| POST | `/api/team/assign` | Assign conversation |
+| GET/POST | `/api/channels` | Connect channels |
+| GET | `/api/analytics/dashboard` | Analytics dashboard |
+| GET | `/api/config/ai` | AI configuration |
+| PUT | `/api/config/ai/{id}` | Update AI config |
+| GET | `/api/config/qr` | WhatsApp QR code |
+| GET | `/api/config/status` | Connection status |
+| GET | `/api/widget/config` | Web widget config |
 
-## Real-time Updates
+## Docker
 
-SignalR hub is available at `/hubs/messages` for real-time message and conversation updates.
+```bash
+export AI_API_KEY=sk-ant-...
+docker compose up --build
+```
+
+## All Open Source & Free
+
+This project uses zero paid dependencies:
+- **SQLite** — file-based database, no server needed
+- **Baileys** — free WhatsApp Web API (no Business API fees)
+- **Bootstrap 5** — free UI framework
+- **Chart.js** — free analytics charts
+- **SignalR** — free real-time WebSockets
+- **MediatR, FluentValidation, AutoMapper** — free NuGet packages
